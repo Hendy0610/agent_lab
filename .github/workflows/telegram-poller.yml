@@ -1,0 +1,58 @@
+name: Telegram Poller
+
+on:
+  schedule:
+    - cron: '*/2 * * * *'
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+
+      - name: Restore Telegram offset
+        uses: actions/cache@v4
+        with:
+          path: .telegram_offset
+          key: telegram-offset-${{ github.run_id }}
+          restore-keys: telegram-offset-
+
+      - name: Read offset
+        id: read-offset
+        run: |
+          if [ -f .telegram_offset ]; then
+            echo "offset=$(cat .telegram_offset)" >> $GITHUB_OUTPUT
+          else
+            echo "offset=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Poll Telegram
+        id: poll
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LAST_UPDATE_ID: ${{ steps.read-offset.outputs.offset }}
+        run: |
+          cd scripts
+          output=$(python telegram_poller.py)
+          echo "$output"
+          new_offset=$(echo "$output" | grep "NEW_OFFSET=" | cut -d= -f2)
+          echo "new_offset=$new_offset" >> $GITHUB_OUTPUT
+
+      - name: Save offset
+        run: echo "${{ steps.poll.outputs.new_offset }}" > .telegram_offset
+
+      - name: Cache Telegram offset
+        uses: actions/cache@v4
+        with:
+          path: .telegram_offset
+          key: telegram-offset-${{ github.run_id }}

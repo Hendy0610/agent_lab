@@ -1,0 +1,81 @@
+name: Requirements Agent
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  process-new-issue:
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Run Requirements Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          TRIGGER: new_issue
+        run: |
+          cd scripts
+          python requirements_agent.py
+
+  process-qa-approved:
+    if: |
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '/qa-approved')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Get PR number from issue
+        id: get-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          python -c "
+          import os, requests
+          token = os.environ['GITHUB_TOKEN']
+          issue_num = os.environ['ISSUE_NUMBER']
+          headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+          r = requests.get(f'https://api.github.com/repos/Hendy0610/agent_lab/issues/{issue_num}/events', headers=headers)
+          # find PR from cross-reference events
+          prs = requests.get(f'https://api.github.com/repos/Hendy0610/agent_lab/pulls?state=open', headers=headers).json()
+          pr_num = ''
+          for pr in prs:
+              body = pr.get('body', '') or ''
+              if f'#{issue_num}' in body or f'Closes #{issue_num}' in body:
+                  pr_num = str(pr['number'])
+                  break
+          print(f'pr_number={pr_num}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'pr_number={pr_num}\n')
+          "
+      - name: Run Requirements Agent (Showcase)
+        if: steps.get-pr.outputs.pr_number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ steps.get-pr.outputs.pr_number }}
+          TRIGGER: showcase_request
+        run: |
+          cd scripts
+          python requirements_agent.py

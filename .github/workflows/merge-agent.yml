@@ -1,0 +1,101 @@
+name: Merge Agent
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  merge:
+    if: |
+      contains(github.event.comment.body, '/approve-merge') ||
+      contains(github.event.comment.body, '/Freigegeben zum Merge')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Find and merge PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          python -c "
+          import os, requests
+          token = os.environ['GITHUB_TOKEN']
+          issue_num = os.environ.get('ISSUE_NUMBER', '')
+          headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+          repo = 'Hendy0610/agent_lab'
+
+          # find open PR linked to this issue
+          prs = requests.get(f'https://api.github.com/repos/{repo}/pulls?state=open', headers=headers).json()
+          pr_num = None
+          pr_branch = None
+          for pr in prs:
+              body = pr.get('body', '') or ''
+              if issue_num and (f'#{issue_num}' in body or f'Closes #{issue_num}' in body):
+                  pr_num = pr['number']
+                  pr_branch = pr['head']['ref']
+                  break
+
+          if not pr_num:
+              print('No matching PR found')
+              exit(1)
+
+          # check qa-approved label
+          pr_detail = requests.get(f'https://api.github.com/repos/{repo}/pulls/{pr_num}', headers=headers).json()
+          labels = [l['name'] for l in pr_detail.get('labels', [])]
+          if 'status/qa-approved' not in labels:
+              requests.post(f'https://api.github.com/repos/{repo}/issues/{pr_num}/comments',
+                  headers=headers, json={'body': 'Merge abgelehnt: QA hat noch kein APPROVED gegeben.'})
+              exit(1)
+
+          # merge
+          r = requests.put(f'https://api.github.com/repos/{repo}/pulls/{pr_num}/merge',
+              headers=headers,
+              json={'commit_title': f'Merge PR #{pr_num}', 'merge_method': 'squash'})
+
+          if r.status_code == 200:
+              requests.post(f'https://api.github.com/repos/{repo}/issues/{pr_num}/comments',
+                  headers=headers, json={'body': f'/merged-to-main {r.json().get(\"sha\", \"\")}'})
+              if issue_num:
+                  requests.post(f'https://api.github.com/repos/{repo}/issues/{issue_num}/comments',
+                      headers=headers, json={'body': '/merged-to-main - Feature erfolgreich auf main gemergt.'})
+                  # close issue
+                  requests.patch(f'https://api.github.com/repos/{repo}/issues/{issue_num}',
+                      headers=headers, json={'state': 'closed', 'labels': ['status/done', 'status/merged']})
+              print(f'Merged PR #{pr_num}')
+          else:
+              print(f'Merge failed: {r.text}')
+              exit(1)
+          "
+
+      - name: Send Telegram notification
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          pip install requests -q
+          python -c "
+          import os, requests
+          token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
+          issue_num = os.environ.get('ISSUE_NUMBER', '')
+          if token and chat_id:
+              requests.post(
+                  f'https://api.telegram.org/bot{token}/sendMessage',
+                  json={'chat_id': chat_id, 'text': f'🎉 *Fertig! Feature gemergt — Issue #{issue_num}*', 'parse_mode': 'Markdown'}
+              )
+          "
