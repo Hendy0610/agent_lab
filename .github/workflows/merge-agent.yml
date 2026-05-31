@@ -58,7 +58,17 @@ jobs:
           labels = [l['name'] for l in pr_detail.get('labels', [])]
           if 'status/qa-approved' not in labels:
               requests.post(f'https://api.github.com/repos/{repo}/issues/{pr_num}/comments',
-                  headers=headers, json={'body': 'Merge abgelehnt: QA hat noch kein APPROVED gegeben.'})
+                  headers=headers, json={'body': '⚠️ Merge abgelehnt: QA hat noch kein APPROVED gegeben.'})
+              exit(1)
+
+          # check CI status
+          head_sha = pr_detail['head']['sha']
+          check_runs = requests.get(f'https://api.github.com/repos/{repo}/commits/{head_sha}/check-runs', headers=headers).json()
+          failed_checks = [r for r in check_runs.get('check_runs', []) if r.get('conclusion') in ('failure', 'timed_out', 'cancelled')]
+          if failed_checks:
+              names = ', '.join(r['name'] for r in failed_checks)
+              requests.post(f'https://api.github.com/repos/{repo}/issues/{pr_num}/comments',
+                  headers=headers, json={'body': f'⚠️ Merge abgelehnt: CI-Checks fehlgeschlagen ({names}). Bitte behebe die Fehler zuerst.'})
               exit(1)
 
           # merge
