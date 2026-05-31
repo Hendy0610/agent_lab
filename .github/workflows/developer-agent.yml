@@ -1,0 +1,38 @@
+name: Developer Agent
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  start-development:
+    if: |
+      github.event_name == 'issue_comment' &&
+      (contains(github.event.comment.body, '/approve-development') ||
+       contains(github.event.comment.body, '/Freigegeben für Entwicklung'))
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Configure git
+        run: |
+          git config user.email "developer-agent@agent-lab"
+          git config user.name "Developer Agent"
+      - name: Run Developer Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          cd scripts
+          python developer_agent.py

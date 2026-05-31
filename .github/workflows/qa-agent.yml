@@ -1,0 +1,28 @@
+name: QA Agent
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  qa-review:
+    if: github.event.label.name == 'status/ready-for-qa'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Run QA Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          cd scripts
+          python qa_agent.py
