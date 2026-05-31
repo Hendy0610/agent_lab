@@ -1,15 +1,69 @@
 import os
+import re
+import time
 import requests
 from github import Github
 
 
 def get_github_client():
-    token = os.environ["GITHUB_TOKEN"]
+    token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", "")
     return Github(token)
 
 
-def get_repo():
-    return get_github_client().get_repo("Hendy0610/agent_lab")
+def get_repo(repo_name: str = "Hendy0610/agent_lab"):
+    return get_github_client().get_repo(repo_name)
+
+
+def get_target_repo_name(issue) -> str:
+    for comment in issue.get_comments():
+        match = re.search(r'<!--\s*TARGET_REPO:\s*([\w\-./]+)\s*-->', comment.body or "")
+        if match:
+            return match.group(1)
+    # also check issue body
+    match = re.search(r'<!--\s*TARGET_REPO:\s*([\w\-./]+)\s*-->', issue.body or "")
+    if match:
+        return match.group(1)
+    return "Hendy0610/agent_lab"
+
+
+def create_repo_if_not_exists(repo_name: str) -> bool:
+    """Create repo if it doesn't exist. Returns True if created or already exists."""
+    token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", "")
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    owner, name = repo_name.split("/", 1)
+
+    # check if exists
+    r = requests.get(f"https://api.github.com/repos/{repo_name}", headers=headers)
+    if r.status_code == 200:
+        return True  # already exists
+
+    # create it
+    r = requests.post(
+        "https://api.github.com/user/repos",
+        headers=headers,
+        json={
+            "name": name,
+            "description": "Project managed by Agent Lab",
+            "private": False,
+            "auto_init": True  # creates main branch with README
+        }
+    )
+    if r.status_code == 201:
+        print(f"Created repo: {repo_name}")
+        time.sleep(3)  # wait for GitHub to initialize
+        return True
+    else:
+        print(f"Failed to create repo: {r.text}")
+        return False
+
+
+def get_pr_info_from_issue(issue) -> tuple:
+    """Returns (repo_name, pr_number) from issue comments."""
+    for comment in issue.get_comments():
+        match = re.search(r'<!--\s*PR_INFO:\s*repo=([\w\-./]+)\s+pr=(\d+)\s*-->', comment.body or "")
+        if match:
+            return match.group(1), int(match.group(2))
+    return None, None
 
 
 def post_comment(issue_or_pr, body: str):
@@ -24,14 +78,14 @@ def set_labels(issue_or_pr, labels_to_add: list, labels_to_remove: list = None):
     issue_or_pr.set_labels(*new_labels)
 
 
-def get_pr_diff(pr_number: int) -> str:
-    token = os.environ["GITHUB_TOKEN"]
+def get_pr_diff(pr_number: int, repo_name: str = "Hendy0610/agent_lab") -> str:
+    token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", "")
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3.diff"
     }
     r = requests.get(
-        f"https://api.github.com/repos/Hendy0610/agent_lab/pulls/{pr_number}",
+        f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}",
         headers=headers
     )
     return r.text

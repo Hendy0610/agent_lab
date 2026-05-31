@@ -1,4 +1,5 @@
 import os
+import re
 import anthropic
 from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist
 from telegram_utils import send_message
@@ -7,7 +8,7 @@ SYSTEM_PROMPT = """Du bist der Requirements Agent für Hendriks repo-gebundenes 
 
 Du bist der einzige Eingangspunkt für neue Ideen. Deine Aufgabe ist es, aus groben Ideen klare, umsetzbare Anforderungen zu machen.
 
-Arbeite ausschließlich für dieses Repository: https://github.com/Hendy0610/agent_lab
+Du arbeitest entweder im Agent Lab Repository oder erstellst ein neues Repository für neue Projekte.
 
 Erfinde keine externen Produktbereiche und erweitere den Scope nicht ohne Freigabe.
 
@@ -55,11 +56,40 @@ Schreibe alles auf Deutsch. Sei konkret und umsetzbar."""
 
     requirements_text = message.content[0].text
 
+    # Classify the idea: agent system improvement or new project?
+    classification = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=200,
+        messages=[{"role": "user", "content": f"""Klassifiziere diese Idee:
+
+"{issue.title}: {issue.body or ''}"
+
+Antworte NUR mit einer der folgenden Optionen:
+- AGENT_SYSTEM: wenn die Idee die Agenten selbst, ihre Prompts, Workflows, Templates, QA-Regeln oder die Pipeline verbessert
+- NEW_PROJECT: wenn die Idee ein neues Produkt, eine neue App oder ein neues unabhängiges Projekt ist
+
+Nur das eine Wort, sonst nichts."""}]
+    )
+    classification_text = classification.content[0].text.strip()
+
+    # Determine target repo
+    if "NEW_PROJECT" in classification_text:
+        slug = re.sub(r'[^a-z0-9]+', '-', issue.title.lower()).strip('-')[:40]
+        target_repo = f"Hendy0610/{slug}"
+        repo_note = f"🆕 Neues Repository wird erstellt: `{target_repo}`"
+    else:
+        target_repo = "Hendy0610/agent_lab"
+        repo_note = f"🔧 Entwicklung im Agent Lab: `{target_repo}`"
+
     comment_body = f"""## 📋 Requirements Agent — Anforderungsanalyse
 
 {requirements_text}
 
 ---
+
+**Entwicklungs-Repository:** {repo_note}
+
+<!-- TARGET_REPO: {target_repo} -->
 
 **Bitte um Freigabe:**
 - `/approve-development` — Freigabe für Entwicklung
