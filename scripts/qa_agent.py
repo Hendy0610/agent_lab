@@ -2,6 +2,7 @@ import os
 import re
 import anthropic
 from github_utils import get_repo, post_comment, set_labels, get_pr_diff, ensure_labels_exist
+from telegram_utils import send_message
 
 SYSTEM_PROMPT = """Du bist der QA & Architecture Agent für Hendriks repo-gebundenes Multi-Agent-Entwicklungssystem.
 
@@ -105,13 +106,18 @@ Schreibe auf Deutsch."""
 
     if verdict == "APPROVED":
         set_labels(pr, ["status/qa-approved"], ["status/ready-for-qa", "status/qa-in-progress"])
+        send_message(f"🔍 *QA abgeschlossen — PR #{pr_number}*\nStatus: ✅ APPROVED\n\nRequirements Agent erstellt jetzt den Showcase...")
         # Also comment on linked issue to trigger showcase
         if issue:
             post_comment(issue, f"/qa-approved\n\nPR #{pr_number} wurde vom QA Agent freigegeben.\n\n*QA & Architecture Agent*")
     elif verdict == "CHANGES_REQUESTED":
         set_labels(pr, ["status/changes-requested"], ["status/ready-for-qa", "status/qa-in-progress"])
+        short_review = review_text[:300] + "..."
+        send_message(f"🔄 *QA: Änderungen erforderlich — PR #{pr_number}*\n\n{short_review}")
     elif verdict == "BLOCKED":
         set_labels(pr, ["status/blocked"], ["status/ready-for-qa", "status/qa-in-progress"])
+        short_review = review_text[:300] + "..."
+        send_message(f"🚫 *QA: Geblockt — PR #{pr_number}*\n\n{short_review}")
 
     print(f"QA review posted: {verdict}")
 

@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 import anthropic
 from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist
+from telegram_utils import send_message
 
 SYSTEM_PROMPT = """Du bist der Developer Agent für Hendriks repo-gebundenes Multi-Agent-Entwicklungssystem.
 
@@ -232,6 +233,12 @@ Halte dich strikt an die Anforderungen. Keine unnötigen Zusätze."""
     )
 
     set_labels(pr, ["status/ready-for-qa", "agent/qa-architecture"])
+
+    send_message(
+        f"🔨 *Implementierung fertig — Issue #{issue_number}*\n\n"
+        f"PR erstellt: {pr.html_url}\n\n"
+        f"QA Agent prüft jetzt automatisch..."
+    )
 
     post_comment(issue,
                  f"""/development-started

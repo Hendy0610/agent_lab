@@ -79,3 +79,23 @@ jobs:
               print(f'Merge failed: {r.text}')
               exit(1)
           "
+
+      - name: Send Telegram notification
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          pip install requests -q
+          python -c "
+          import os, requests
+          token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
+          issue_num = os.environ.get('ISSUE_NUMBER', '')
+          if token and chat_id:
+              requests.post(
+                  f'https://api.telegram.org/bot{token}/sendMessage',
+                  json={'chat_id': chat_id, 'text': f'🎉 *Fertig! Feature gemergt — Issue #{issue_num}*', 'parse_mode': 'Markdown'}
+              )
+          "
