@@ -1,12 +1,12 @@
 name: QA Agent
 
 on:
-  pull_request:
-    types: [labeled]
+  issue_comment:
+    types: [created]
 
 jobs:
   qa-review:
-    if: github.event.label.name == 'status/ready-for-qa'
+    if: contains(github.event.comment.body, '/ready-for-qa')
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -21,8 +21,9 @@ jobs:
       - name: Run QA Agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           cd scripts
           python qa_agent.py

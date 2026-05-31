@@ -1,14 +1,15 @@
 import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 import anthropic
-from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist
+from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist, get_target_repo_name, create_repo_if_not_exists
 from telegram_utils import send_message
 
 SYSTEM_PROMPT = """Du bist der Developer Agent für Hendriks repo-gebundenes Multi-Agent-Entwicklungssystem.
 
-Du implementierst ausschließlich freigegebene Issues in diesem Repository: https://github.com/Hendy0610/agent_lab
+Du implementierst ausschließlich freigegebene Issues.
 
 Du darfst:
 - Dateien lesen, erstellen und bearbeiten
@@ -52,6 +53,24 @@ def main():
     issue = repo.get_issue(issue_number)
 
     ensure_labels_exist()
+
+    # Determine target repo and set up work directory
+    target_repo_name = get_target_repo_name(issue)
+
+    if target_repo_name != "Hendy0610/agent_lab":
+        # Create repo if it doesn't exist yet
+        create_repo_if_not_exists(target_repo_name)
+        # Clone the target repo
+        token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", "")
+        work_dir = f"/tmp/workdir_{issue_number}"
+        subprocess.run(
+            ["git", "clone", f"https://x-access-token:{token}@github.com/{target_repo_name}.git", work_dir],
+            check=True
+        )
+        subprocess.run(["git", "config", "user.email", "developer-agent@agent-lab"], cwd=work_dir, check=True)
+        subprocess.run(["git", "config", "user.name", "Developer Agent"], cwd=work_dir, check=True)
+    else:
+        work_dir = "."
 
     # Gather requirements from issue and comments
     comments = list(issue.get_comments())
@@ -116,7 +135,7 @@ def main():
         }
     ]
 
-    repo_tree = get_repo_tree(".")
+    repo_tree = get_repo_tree(work_dir)
 
     messages = [
         {
@@ -169,7 +188,7 @@ Halte dich strikt an die Anforderungen. Keine unnötigen Zusätze."""
             result = ""
 
             if tool_name == "read_file":
-                path = tool_input["path"]
+                path = os.path.join(work_dir, tool_input["path"])
                 try:
                     with open(path, 'r', encoding='utf-8') as f:
                         result = f.read()
@@ -177,18 +196,18 @@ Halte dich strikt an die Anforderungen. Keine unnötigen Zusätze."""
                     result = f"Error: {e}"
 
             elif tool_name == "write_file":
-                path = tool_input["path"]
+                path = os.path.join(work_dir, tool_input["path"])
                 content = tool_input["content"]
                 try:
                     Path(path).parent.mkdir(parents=True, exist_ok=True)
                     with open(path, 'w', encoding='utf-8') as f:
                         f.write(content)
-                    result = f"Written: {path}"
+                    result = f"Written: {tool_input['path']}"
                 except Exception as e:
                     result = f"Error: {e}"
 
             elif tool_name == "list_directory":
-                path = tool_input.get("path", ".")
+                path = os.path.join(work_dir, tool_input.get("path", "."))
                 try:
                     entries = sorted(os.listdir(path))
                     result = "\n".join(entries)
@@ -218,13 +237,13 @@ Halte dich strikt an die Anforderungen. Keine unnötigen Zusätze."""
         pr_body = f"## Summary\n\nImplementation for issue #{issue_number}\n\n## Linked Issue\n\nCloses #{issue_number}"
 
     # Git operations
-    run_git(["checkout", "-b", branch_name])
-    run_git(["add", "-A"])
-    run_git(["commit", "-m", f"[#{issue_number}] {issue.title}"])
-    run_git(["push", "-u", "origin", branch_name])
+    run_git(["checkout", "-b", branch_name], cwd=work_dir)
+    run_git(["add", "-A"], cwd=work_dir)
+    run_git(["commit", "-m", f"[#{issue_number}] {issue.title}"], cwd=work_dir)
+    run_git(["push", "-u", "origin", branch_name], cwd=work_dir)
 
-    # Create PR
-    gh_repo = get_repo()
+    # Create PR in the target repo
+    gh_repo = get_repo(target_repo_name)
     pr = gh_repo.create_pull(
         title=f"[#{issue_number}] {pr_title}",
         body=pr_body + f"\n\nCloses #{issue_number}",
@@ -245,6 +264,7 @@ Halte dich strikt an die Anforderungen. Keine unnötigen Zusätze."""
 
 Implementierung abgeschlossen.
 
+<!-- PR_INFO: repo={target_repo_name} pr={pr.number} -->
 /pr-created {pr.html_url}
 
 /ready-for-qa
