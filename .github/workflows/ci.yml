@@ -1,0 +1,47 @@
+name: CI Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  syntax-check:
+    name: Syntax & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install flake8
+      - name: Syntax check (py_compile)
+        run: |
+          find . -name "*.py" -not -path "./.git/*" -exec python -m py_compile {} \;
+          echo "Syntax check passed"
+      - name: Lint (flake8)
+        run: |
+          flake8 scripts/ \
+            --max-line-length=120 \
+            --extend-ignore=E501,W503,E303 \
+            --count \
+            --statistics
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-mock
+      - name: Run tests
+        run: |
+          if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+            pytest --tb=short -v
+          else
+            echo "No tests found — skipping"
+          fi
