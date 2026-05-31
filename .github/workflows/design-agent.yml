@@ -1,38 +1,37 @@
-name: Developer Agent
+name: Design Agent
 
 on:
   issue_comment:
     types: [created]
 
 jobs:
-  start-development:
+  create-design:
     if: |
       github.event_name == 'issue_comment' &&
-      (contains(github.event.comment.body, '/approve-design') ||
-       contains(github.event.comment.body, '/Freigegeben für Design'))
+      (contains(github.event.comment.body, '/approve-development') ||
+       contains(github.event.comment.body, '/Freigegeben für Entwicklung'))
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      pull-requests: write
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - name: Configure git
+      - name: Install Playwright
         run: |
-          git config user.email "developer-agent@agent-lab"
-          git config user.name "Developer Agent"
-      - name: Run Developer Agent
+          pip install playwright
+          playwright install chromium --with-deps
+      - name: Run Design Agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           cd scripts
-          python developer_agent.py
+          python design_agent.py

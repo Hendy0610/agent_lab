@@ -22,13 +22,22 @@ def handle_idea(text: str, repo):
     return issue
 
 def handle_approve(issue_number: int, repo):
-    """Post approve-development comment on issue."""
+    """Post approve-development comment on issue (triggers Design Agent)."""
     try:
         issue = repo.get_issue(issue_number)
         issue.create_comment("/approve-development")
-        send_message(f"✅ *Issue #{issue_number} freigegeben!*\nDer Developer Agent startet jetzt mit der Implementierung.")
+        send_message(f"✅ *Issue #{issue_number} freigegeben!*\nDer Design Agent erstellt jetzt das UI/UX Design.")
     except Exception as e:
         send_message(f"❌ Fehler bei Freigabe von Issue #{issue_number}: {e}")
+
+def handle_approve_design(issue_number: int, repo):
+    """Post approve-design comment on issue (triggers Developer Agent)."""
+    try:
+        issue = repo.get_issue(issue_number)
+        issue.create_comment(f"/approve-design {issue_number}")
+        send_message(f"✅ *Design für Issue #{issue_number} freigegeben!*\nDer Developer Agent startet jetzt mit der Implementierung.")
+    except Exception as e:
+        send_message(f"❌ Fehler: {e}")
 
 def handle_merge(issue_number: int, repo):
     """Post approve-merge comment on issue."""
@@ -80,9 +89,12 @@ def main():
 
         # Parse commands
         approve_match = re.match(r'^/approve\s+(\d+)$', text, re.IGNORECASE)
+        approve_design_match = re.match(r'^/approve-design\s+(\d+)$', text, re.IGNORECASE)
         merge_match = re.match(r'^/merge\s+(\d+)$', text, re.IGNORECASE)
 
-        if approve_match:
+        if approve_design_match:
+            handle_approve_design(int(approve_design_match.group(1)), repo)
+        elif approve_match:
             handle_approve(int(approve_match.group(1)), repo)
         elif merge_match:
             handle_merge(int(merge_match.group(1)), repo)
@@ -91,7 +103,7 @@ def main():
         elif not text.startswith('/'):
             handle_idea(text, repo)
         else:
-            send_message(f"Unbekannter Befehl: `{text}`\n\nVerfügbare Befehle:\n• Idee als Text senden\n• `/approve <nummer>`\n• `/merge <nummer>`\n• `/status`")
+            send_message(f"Unbekannter Befehl: `{text}`\n\nVerfügbare Befehle:\n• Idee als Text senden\n• `/approve <nummer>`\n• `/approve-design <nummer>`\n• `/merge <nummer>`\n• `/status`")
 
     # Output new offset for the workflow to save
     print(f"NEW_OFFSET={new_max_id}")
