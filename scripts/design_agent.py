@@ -4,7 +4,7 @@ import base64
 import anthropic
 import requests
 from pathlib import Path
-from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist
+from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist, get_target_repo_name
 from telegram_utils import send_message
 
 SYSTEM_PROMPT = """Du bist der Design Agent für Hendriks repo-gebundenes Multi-Agent-Entwicklungssystem.
@@ -52,8 +52,13 @@ def send_telegram_photo(image_path: str, caption: str):
 
 def upload_image_to_github(image_path: str, repo_name: str = "Hendy0610/agent_lab") -> str:
     """Upload image to GitHub and return markdown image reference."""
-    token = os.environ.get("GITHUB_TOKEN", "")
+    token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", "")
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
+    # Determine branch: use main for non-agent_lab repos
+    branch = os.environ.get("GITHUB_REF_NAME", "main")
+    if branch != "main" and repo_name != "Hendy0610/agent_lab":
+        branch = "main"
 
     # Upload to repo as a file in .github/designs/
     with open(image_path, "rb") as f:
@@ -65,11 +70,11 @@ def upload_image_to_github(image_path: str, repo_name: str = "Hendy0610/agent_la
     r = requests.put(api_url, headers=headers, json={
         "message": f"Add design screenshot {filename}",
         "content": content,
-        "branch": os.environ.get("GITHUB_REF_NAME", "main")
+        "branch": branch
     })
 
     if r.status_code in (200, 201):
-        raw_url = f"https://raw.githubusercontent.com/{repo_name}/{os.environ.get('GITHUB_REF_NAME', 'main')}/.github/designs/{filename}"
+        raw_url = f"https://raw.githubusercontent.com/{repo_name}/{branch}/.github/designs/{filename}"
         return raw_url
     else:
         print(f"Image upload failed: {r.text}")
@@ -81,6 +86,9 @@ def main():
     issue = repo.get_issue(issue_number)
 
     ensure_labels_exist()
+
+    # Determine target repo
+    target_repo = get_target_repo_name(issue)
 
     # Gather requirements from issue and comments
     requirements_text = f"# {issue.title}\n\n{issue.body or ''}\n\n"
@@ -149,7 +157,7 @@ Trenne Design-Dokument und HTML klar mit dem Marker: `---HTML_MOCKUP---`"""
     # Post design document as issue comment
     image_ref = ""
     if screenshot_ok:
-        image_url = upload_image_to_github(screenshot_path, "Hendy0610/agent_lab")
+        image_url = upload_image_to_github(screenshot_path, target_repo)
         if image_url:
             image_ref = f"\n\n## Mockup\n\n![Design Mockup]({image_url})\n"
 

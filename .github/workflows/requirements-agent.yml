@@ -22,6 +22,7 @@ jobs:
       - name: Run Requirements Agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           TRIGGER: new_issue
@@ -48,30 +49,43 @@ jobs:
         id: get-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           python -c "
-          import os, requests
-          token = os.environ['GITHUB_TOKEN']
+          import os, requests, re
+          token = os.environ.get('GH_PAT') or os.environ['GITHUB_TOKEN']
           issue_num = os.environ['ISSUE_NUMBER']
           headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-          r = requests.get(f'https://api.github.com/repos/Hendy0610/agent_lab/issues/{issue_num}/events', headers=headers)
-          # find PR from cross-reference events
-          prs = requests.get(f'https://api.github.com/repos/Hendy0610/agent_lab/pulls?state=open', headers=headers).json()
+          # Get issue comments to find PR_INFO marker
+          r = requests.get(f'https://api.github.com/repos/Hendy0610/agent_lab/issues/{issue_num}/comments', headers=headers)
           pr_num = ''
-          for pr in prs:
-              body = pr.get('body', '') or ''
-              if f'#{issue_num}' in body or f'Closes #{issue_num}' in body:
-                  pr_num = str(pr['number'])
+          pr_repo = 'Hendy0610/agent_lab'
+          for comment in r.json():
+              body = comment.get('body', '') or ''
+              match = re.search(r'<!--\s*PR_INFO:\s*repo=([\w\-./]+)\s+pr=(\d+)\s*-->', body)
+              if match:
+                  pr_repo = match.group(1)
+                  pr_num = match.group(2)
                   break
-          print(f'pr_number={pr_num}')
+          if not pr_num:
+              # fallback: search open PRs
+              prs = requests.get(f'https://api.github.com/repos/Hendy0610/agent_lab/pulls?state=open', headers=headers).json()
+              for pr in prs:
+                  body = pr.get('body', '') or ''
+                  if f'#{issue_num}' in body or f'Closes #{issue_num}' in body:
+                      pr_num = str(pr['number'])
+                      break
+          print(f'pr_number={pr_num}, pr_repo={pr_repo}')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f'pr_number={pr_num}\n')
+              f.write(f'pr_repo={pr_repo}\n')
           "
       - name: Run Requirements Agent (Showcase)
         if: steps.get-pr.outputs.pr_number != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           PR_NUMBER: ${{ steps.get-pr.outputs.pr_number }}
