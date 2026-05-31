@@ -1,0 +1,50 @@
+name: Setup Branch Protection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply branch protection rules for main
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          curl -s -X PUT \
+            -H "Authorization: token $GH_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/Hendy0610/agent_lab/branches/main/protection \
+            -d '{
+              "required_status_checks": {
+                "strict": true,
+                "checks": [
+                  {"context": "Syntax & Lint"},
+                  {"context": "Tests"}
+                ]
+              },
+              "enforce_admins": false,
+              "required_pull_request_reviews": {
+                "dismiss_stale_reviews": false,
+                "require_code_owner_reviews": false,
+                "required_approving_review_count": 0
+              },
+              "required_conversation_resolution": true,
+              "restrictions": null,
+              "allow_force_pushes": false,
+              "allow_deletions": false
+            }' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if 'url' in data:
+              print('Branch protection successfully applied.')
+              print(f'  Required checks: Syntax & Lint, Tests')
+              print(f'  Force pushes: blocked')
+              print(f'  Branch deletion: blocked')
+              print(f'  PR required: yes')
+              print(f'  Up-to-date branch required: yes')
+              print(f'  Conversation resolution required: yes')
+          else:
+              print('ERROR:', json.dumps(data, indent=2))
+              sys.exit(1)
+          "
