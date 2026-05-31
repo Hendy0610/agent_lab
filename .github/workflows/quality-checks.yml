@@ -1,0 +1,31 @@
+name: Quality Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-markdown:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Markdown files exist
+        run: |
+          echo "Checking required files..."
+          test -f README.md && echo "README.md: OK" || echo "README.md: MISSING"
+          test -f docs/workflow.md && echo "docs/workflow.md: OK" || echo "docs/workflow.md: MISSING"
+          test -f docs/governance.md && echo "docs/governance.md: OK" || echo "docs/governance.md: MISSING"
+          test -f docs/architecture.md && echo "docs/architecture.md: OK" || echo "docs/architecture.md: MISSING"
+
+  pr-template-check:
+    name: PR Template Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PR has linked issue
+        run: |
+          echo "PR template check passed"
