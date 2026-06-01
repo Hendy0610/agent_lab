@@ -1,6 +1,6 @@
 import os
 import re
-from telegram_utils import send_message, get_updates
+from telegram_utils import send_message, get_updates, answer_callback_query
 from github_utils import get_repo, ensure_labels_exist
 
 
@@ -67,6 +67,36 @@ def handle_status(repo):
     send_message('\n'.join(lines))
 
 
+def handle_callback(callback_query: dict, repo):
+    """Handle inline button presses."""
+    callback_id = callback_query.get("id", "")
+    data = callback_query.get("data", "")
+    chat_id_cb = str(callback_query.get("message", {}).get("chat", {}).get("id", ""))
+    configured_chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+    if configured_chat and chat_id_cb != configured_chat:
+        return
+
+    # Callback data format: "action:issue_number"
+    match = re.match(r'^(approve_dev|approve_design|merge):(\d+)$', data)
+    if not match:
+        answer_callback_query(callback_id, "Unbekannte Aktion")
+        return
+
+    action, issue_num_str = match.group(1), match.group(2)
+    issue_number = int(issue_num_str)
+
+    if action == "approve_dev":
+        answer_callback_query(callback_id, "✅ Freigabe wird übermittelt...")
+        handle_approve(issue_number, repo)
+    elif action == "approve_design":
+        answer_callback_query(callback_id, "✅ Design-Freigabe wird übermittelt...")
+        handle_approve_design(issue_number, repo)
+    elif action == "merge":
+        answer_callback_query(callback_id, "✅ Merge-Freigabe wird übermittelt...")
+        handle_merge(issue_number, repo)
+
+
 def main():
     last_update_id = int(os.environ.get("LAST_UPDATE_ID", "0"))
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -79,6 +109,12 @@ def main():
     for update in updates:
         update_id = update.get("update_id", 0)
         new_max_id = max(new_max_id, update_id)
+
+        # Handle inline button callbacks
+        callback_query = update.get("callback_query")
+        if callback_query:
+            handle_callback(callback_query, repo)
+            continue
 
         message = update.get("message", {})
         if not message:
@@ -110,7 +146,13 @@ def main():
             handle_idea(text, repo)
         else:
             send_message(
-                f"Unbekannter Befehl: `{text}`\n\nVerfügbare Befehle:\n• Idee als Text senden\n• `/approve <nummer>`\n• `/approve-design <nummer>`\n• `/merge <nummer>`\n• `/status`")
+                f"Unbekannter Befehl: `{text}`\n\nVerfügbare Befehle:\n"
+                f"• Idee als Text senden\n"
+                f"• `/approve <nummer>`\n"
+                f"• `/approve-design <nummer>`\n"
+                f"• `/merge <nummer>`\n"
+                f"• `/status`"
+            )
 
     # Output new offset for the workflow to save
     print(f"NEW_OFFSET={new_max_id}")
