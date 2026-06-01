@@ -71,9 +71,9 @@ def post_comment(issue_or_pr, body: str):
 
 
 def set_labels(issue_or_pr, labels_to_add: list, labels_to_remove: list = None):
-    current = [l.name for l in issue_or_pr.labels]
+    current = [lb.name for lb in issue_or_pr.labels]
     if labels_to_remove:
-        current = [l for l in current if l not in labels_to_remove]
+        current = [lb for lb in current if lb not in labels_to_remove]
     new_labels = list(set(current + labels_to_add))
     issue_or_pr.set_labels(*new_labels)
 
@@ -135,7 +135,7 @@ def ensure_labels_exist():
         ("risk/architecture", "e99695"),
         ("risk/breaking-change", "b60205"),
     ]
-    existing = {l.name for l in repo.get_labels()}
+    existing = {lb.name for lb in repo.get_labels()}
     for name, color in required_labels:
         if name not in existing:
             try:
