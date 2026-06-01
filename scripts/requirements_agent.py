@@ -101,8 +101,11 @@ Nur das eine Wort, sonst nichts."""}]
     send_message(
         f"📋 *Anforderungen bereit — Issue #{issue_number}*\n\n"
         f"*{issue.title}*\n\n"
-        f"Der Requirements Agent hat die Anforderungen analysiert.\n\n"
-        f"Freigeben mit: `/approve {issue_number}`"
+        f"Der Requirements Agent hat die Anforderungen analysiert.",
+        buttons=[
+            [("✅ Freigeben", f"approve_dev:{issue_number}"),
+             ("✏️ Ändern", f"noop:{issue_number}")]
+        ]
     )
     set_labels(issue,
                ["status/waiting-for-requirements-approval", "agent/requirements"],
@@ -180,9 +183,11 @@ Bitte entscheide mit einem der folgenden Kommentare:
     # Extract first 500 chars of showcase for the notification
     short_showcase = showcase_text[:500] + "..." if len(showcase_text) > 500 else showcase_text
     send_message(
-        f"✅ *QA freigegeben — Issue #{issue_number}*\n\n"
-        f"{short_showcase}\n\n"
-        f"Merge freigeben mit: `/merge {issue_number}`"
+        f"✅ *QA freigegeben — Issue #{issue_number}*\n\n{short_showcase}",
+        buttons=[
+            [("✅ Merge freigeben", f"merge:{issue_number}"),
+             ("❌ Nicht mergen", f"noop:{issue_number}")]
+        ]
     )
     set_labels(pr,
                ["status/waiting-for-merge-approval"],
