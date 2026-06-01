@@ -77,9 +77,10 @@ Telegram-Kommandos von Hendrik:
 
 ### 4. QA & Architecture Agent
 - **Trigger:** `/ready-for-qa` Kommentar im Issue
-- **Aufgabe:** Liest PR-Diff + Anforderungen + CI-Status + MEMORY.md, erstellt Review
+- **Aufgabe:** Liest PR-Diff + Anforderungen + CI-Status + `MEMORY.md`, erstellt Review
 - **Ergebnis:** `APPROVED`, `CHANGES_REQUESTED` oder `BLOCKED`
-- **Blockiert wenn:** CI fehlschlägt oder noch läuft
+- **Blockiert wenn:** CI fehlschlägt, noch läuft, oder PR gegen `MEMORY.md` verstößt
+- **Memory Check:** Pflichtabschnitt in jedem Review — fehlende `MEMORY.md` = `CHANGES_REQUESTED`
 - **Script:** `scripts/qa_agent.py`
 
 ### 5. Merge Agent
@@ -156,6 +157,7 @@ Telegram: Freitext-Idee
 | Repo-Strategie | Ein Repo pro Projekt | Saubere Trennung, `agent_lab` bleibt Control Plane |
 | Screenshot-Tool | Playwright + Chromium | Läuft in GitHub Actions, kein externer Service |
 | CI-Checks | flake8 + pytest | Leichtgewichtig, keine komplexe Pipeline nötig |
+| QA Memory Awareness | MEMORY.md wird bei jedem Review gelesen | Konsistente Governance-Prüfung ohne externe Wissensbasis |
 | Branch Protection | Nur `main` | Feature-Branches müssen für Developer Agent offen bleiben |
 
 ---
