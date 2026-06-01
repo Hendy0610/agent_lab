@@ -1,9 +1,8 @@
 import os
-import sys
 import re
-import requests
 from telegram_utils import send_message, get_updates
 from github_utils import get_repo, ensure_labels_exist
+
 
 def handle_idea(text: str, repo):
     """Create a GitHub issue from the idea text."""
@@ -18,8 +17,10 @@ def handle_idea(text: str, repo):
         body=body or title,
         labels=["status/idea-received", "agent/requirements", "type/feature"]
     )
-    send_message(f"✅ *Issue erstellt!*\n\nIssue #{issue.number}: {title}\n\nDer Requirements Agent analysiert jetzt deine Idee...")
+    send_message(
+        f"✅ *Issue erstellt!*\n\nIssue #{issue.number}: {title}\n\nDer Requirements Agent analysiert jetzt deine Idee...")
     return issue
+
 
 def handle_approve(issue_number: int, repo):
     """Post approve-development comment on issue (triggers Design Agent)."""
@@ -30,14 +31,17 @@ def handle_approve(issue_number: int, repo):
     except Exception as e:
         send_message(f"❌ Fehler bei Freigabe von Issue #{issue_number}: {e}")
 
+
 def handle_approve_design(issue_number: int, repo):
     """Post approve-design comment on issue (triggers Developer Agent)."""
     try:
         issue = repo.get_issue(issue_number)
         issue.create_comment(f"/approve-design {issue_number}")
-        send_message(f"✅ *Design für Issue #{issue_number} freigegeben!*\nDer Developer Agent startet jetzt mit der Implementierung.")
+        send_message(
+            f"✅ *Design für Issue #{issue_number} freigegeben!*\nDer Developer Agent startet jetzt mit der Implementierung.")
     except Exception as e:
         send_message(f"❌ Fehler: {e}")
+
 
 def handle_merge(issue_number: int, repo):
     """Post approve-merge comment on issue."""
@@ -48,6 +52,7 @@ def handle_merge(issue_number: int, repo):
     except Exception as e:
         send_message(f"❌ Fehler beim Merge von Issue #{issue_number}: {e}")
 
+
 def handle_status(repo):
     """List open issues with their status."""
     issues = list(repo.get_issues(state="open"))[:10]
@@ -56,10 +61,11 @@ def handle_status(repo):
         return
     lines = ["*Offene Issues:*\n"]
     for issue in issues:
-        labels = [l.name for l in issue.labels if l.name.startswith("status/")]
+        labels = [lb.name for lb in issue.labels if lb.name.startswith("status/")]
         status = labels[0].replace("status/", "") if labels else "?"
         lines.append(f"• #{issue.number}: {issue.title[:50]} — `{status}`")
     send_message('\n'.join(lines))
+
 
 def main():
     last_update_id = int(os.environ.get("LAST_UPDATE_ID", "0"))
@@ -103,10 +109,12 @@ def main():
         elif not text.startswith('/'):
             handle_idea(text, repo)
         else:
-            send_message(f"Unbekannter Befehl: `{text}`\n\nVerfügbare Befehle:\n• Idee als Text senden\n• `/approve <nummer>`\n• `/approve-design <nummer>`\n• `/merge <nummer>`\n• `/status`")
+            send_message(
+                f"Unbekannter Befehl: `{text}`\n\nVerfügbare Befehle:\n• Idee als Text senden\n• `/approve <nummer>`\n• `/approve-design <nummer>`\n• `/merge <nummer>`\n• `/status`")
 
     # Output new offset for the workflow to save
     print(f"NEW_OFFSET={new_max_id}")
+
 
 if __name__ == "__main__":
     main()

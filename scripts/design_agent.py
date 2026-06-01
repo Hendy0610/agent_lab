@@ -20,6 +20,7 @@ Nutze ein ansprechendes Farbschema. Verwende nur inline CSS und keine externen R
 
 Sprache für Beschreibungen: Deutsch"""
 
+
 def screenshot_html(html_content: str, output_path: str) -> bool:
     """Screenshot HTML using playwright."""
     try:
@@ -36,6 +37,7 @@ def screenshot_html(html_content: str, output_path: str) -> bool:
         print(f"Screenshot failed: {e}")
         return False
 
+
 def send_telegram_photo(image_path: str, caption: str):
     """Send photo via Telegram Bot API."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -49,6 +51,7 @@ def send_telegram_photo(image_path: str, caption: str):
             data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
             files={"photo": f}
         )
+
 
 def upload_image_to_github(image_path: str, repo_name: str = "Hendy0610/agent_lab") -> str:
     """Upload image to GitHub and return markdown image reference."""
@@ -79,6 +82,7 @@ def upload_image_to_github(image_path: str, repo_name: str = "Hendy0610/agent_la
     else:
         print(f"Image upload failed: {r.text}")
         return ""
+
 
 def main():
     repo = get_repo()
@@ -190,6 +194,7 @@ Design freigeben mit `/approve-design {issue_number}` oder Änderungswunsch mit 
         )
 
     print(f"Design posted for issue #{issue_number}")
+
 
 if __name__ == "__main__":
     main()

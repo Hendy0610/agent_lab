@@ -1,7 +1,7 @@
 import os
 import re
 import subprocess
-import tempfile
+
 from pathlib import Path
 import anthropic
 from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist, get_target_repo_name, create_repo_if_not_exists
