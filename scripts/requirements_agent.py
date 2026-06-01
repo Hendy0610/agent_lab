@@ -51,7 +51,7 @@ Schreibe alles auf Deutsch. Sei konkret und umsetzbar."""
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2000,
-            system=SYSTEM_PROMPT,
+            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": prompt}]
         )
     except Exception as e:
@@ -167,7 +167,7 @@ Schreibe auf Deutsch."""
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2000,
-        system=SYSTEM_PROMPT,
+        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": prompt}]
     )
 
