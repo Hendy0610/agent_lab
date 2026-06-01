@@ -38,6 +38,7 @@ MAIN_KEYBOARD = {
         [{"text": "📋 Status"}, {"text": "💡 Neue Idee"}],
         [{"text": "✅ Approve"}, {"text": "🎨 Design freigeben"}],
         [{"text": "🔀 Merge"}, {"text": "🔒 Issue schließen"}],
+        [{"text": "✏️ Anforderung ändern"}, {"text": "✏️ Design ändern"}],
     ],
     "resize_keyboard": True,
     "persistent": True,
@@ -221,8 +222,27 @@ def handle_callback(callback_query: dict) -> None:
         handle_merge(num)
 
 
-# pending state: stores what action the user selected and is waiting for a number
+# pending state: stores what action + optional context while waiting for user input
+# format: {"action": str, "issue": int|None}
 _pending: dict = {}
+
+
+def handle_request_changes(issue_number: int, feedback: str, change_type: str) -> None:
+    """Post a change request comment on the issue."""
+    try:
+        if change_type == "requirements":
+            comment = f"/request-requirements-changes {feedback}"
+            label = "Anforderungen"
+        else:
+            comment = f"/request-design-changes {feedback}"
+            label = "Design"
+        gh_post(f"repos/{GH_REPO}/issues/{issue_number}/comments", {"body": comment})
+        send_message(
+            f"✏️ *Änderungswunsch für Issue #{issue_number} übermittelt!*\n"
+            f"_{label} Agent wird die Änderungen einarbeiten._"
+        )
+    except Exception as e:
+        send_message(f"❌ Fehler: {e}")
 
 
 def process_message(message: dict) -> None:
@@ -234,22 +254,42 @@ def process_message(message: dict) -> None:
     if not text:
         return
 
-    # Handle pending state (user selected a button and we're waiting for a number)
+    # Handle pending state
     if from_chat in _pending:
-        action = _pending.pop(from_chat)
-        if re.match(r"^\d+$", text):
-            num = int(text)
-            if action == "approve":
-                handle_approve(num)
-            elif action == "approve_design":
-                handle_approve_design(num)
-            elif action == "merge":
-                handle_merge(num)
-            elif action == "close":
-                handle_close(num)
-            return
+        state = _pending[from_chat]
+        action = state["action"]
+        issue = state.get("issue")
+
+        # Step 1: waiting for issue number
+        if issue is None:
+            if re.match(r"^\d+$", text):
+                num = int(text)
+                if action in ("req_changes", "design_changes"):
+                    _pending[from_chat] = {"action": action, "issue": num}
+                    label = "Anforderung" if action == "req_changes" else "Design"
+                    send_message(f"Was soll am {label} geändert werden?\nSchreib dein Feedback:")
+                    return
+                else:
+                    _pending.pop(from_chat)
+                    if action == "approve":
+                        handle_approve(num)
+                    elif action == "approve_design":
+                        handle_approve_design(num)
+                    elif action == "merge":
+                        handle_merge(num)
+                    elif action == "close":
+                        handle_close(num)
+                    return
+            else:
+                _pending.pop(from_chat)
+                send_message("❌ Keine gültige Nummer. Bitte nochmal versuchen.")
+                return
+
+        # Step 2: waiting for feedback text
         else:
-            send_message("❌ Keine gültige Nummer. Bitte nochmal versuchen.", use_keyboard=True)
+            _pending.pop(from_chat)
+            change_type = "requirements" if action == "req_changes" else "design"
+            handle_request_changes(issue, text, change_type)
             return
 
     # Keyboard button texts
@@ -260,20 +300,28 @@ def process_message(message: dict) -> None:
         send_message("Schreib deine Idee als nächste Nachricht:")
         return
     elif text == "✅ Approve":
-        _pending[from_chat] = "approve"
+        _pending[from_chat] = {"action": "approve", "issue": None}
         send_message("Welche Issue-Nummer freigeben?")
         return
     elif text == "🎨 Design freigeben":
-        _pending[from_chat] = "approve_design"
+        _pending[from_chat] = {"action": "approve_design", "issue": None}
         send_message("Welche Issue-Nummer für Design-Freigabe?")
         return
     elif text == "🔀 Merge":
-        _pending[from_chat] = "merge"
+        _pending[from_chat] = {"action": "merge", "issue": None}
         send_message("Welche Issue-Nummer mergen?")
         return
     elif text == "🔒 Issue schließen":
-        _pending[from_chat] = "close"
+        _pending[from_chat] = {"action": "close", "issue": None}
         send_message("Welche Issue-Nummer schließen?")
+        return
+    elif text == "✏️ Anforderung ändern":
+        _pending[from_chat] = {"action": "req_changes", "issue": None}
+        send_message("Welche Issue-Nummer hat die Anforderung?")
+        return
+    elif text == "✏️ Design ändern":
+        _pending[from_chat] = {"action": "design_changes", "issue": None}
+        send_message("Welche Issue-Nummer hat das Design?")
         return
 
     approve_m = re.match(r"^/approve\s+(\d+)$", text, re.IGNORECASE)
