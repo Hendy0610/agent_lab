@@ -27,6 +27,13 @@ jobs:
             --extend-ignore=E501,W503,E303 \
             --count \
             --statistics
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-error
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          failed-job: Syntax & Lint
 
   test:
     name: Tests
@@ -45,3 +52,10 @@ jobs:
           else
             echo "No tests found — skipping"
           fi
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-error
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          failed-job: Tests

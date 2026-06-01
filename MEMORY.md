@@ -158,6 +158,7 @@ Telegram: Freitext-Idee
 | Screenshot-Tool | Playwright + Chromium | Läuft in GitHub Actions, kein externer Service |
 | CI-Checks | flake8 + pytest | Leichtgewichtig, keine komplexe Pipeline nötig |
 | QA Memory Awareness | MEMORY.md wird bei jedem Review gelesen | Konsistente Governance-Prüfung ohne externe Wissensbasis |
+| Error Notifications | `notify_error.py` + Composite Action (`if: failure()`) | Hendrik wird per Telegram informiert wenn Workflows fehlschlagen |
 | Branch Protection | Nur `main` | Feature-Branches müssen für Developer Agent offen bleiben |
 
 ---
@@ -169,7 +170,7 @@ Telegram: Freitext-Idee
 - **Repo-Erstellung:** Neue Projekt-Repos werden public erstellt — Privacy-Implikationen prüfen
 - **Screenshot-Speicherung:** Design-Screenshots werden im Repo unter `.github/designs/` gespeichert — wächst unbegrenzt
 - **Secret Management:** Alle Secrets in `agent_lab` hinterlegt — bei vielen Projekten ggf. GitHub Organization sinnvoll
-- **Error Notifications:** Wenn ein Workflow fehlschlägt, bekommt Hendrik keine Telegram-Nachricht — blinder Fleck
+- ~~**Error Notifications:** gelöst — `scripts/notify_error.py` + Composite Action in allen Workflows~~
 
 ---
 

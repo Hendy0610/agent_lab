@@ -37,3 +37,10 @@ jobs:
         run: |
           cd scripts
           python developer_agent.py
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-error
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          failed-job: Developer Agent

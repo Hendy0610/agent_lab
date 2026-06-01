@@ -1,0 +1,32 @@
+name: Notify Error via Telegram
+description: Send a Telegram error notification when a workflow step fails.
+
+inputs:
+  telegram-bot-token:
+    description: Telegram Bot Token
+    required: true
+  telegram-chat-id:
+    description: Telegram Chat ID
+    required: true
+  failed-job:
+    description: Name of the failed job or step (optional)
+    required: false
+    default: ''
+  error-context:
+    description: Short error description (optional)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Send error notification
+      shell: bash
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ inputs.telegram-bot-token }}
+        TELEGRAM_CHAT_ID: ${{ inputs.telegram-chat-id }}
+        FAILED_JOB: ${{ inputs.failed-job }}
+        ERROR_CONTEXT: ${{ inputs.error-context }}
+      run: |
+        pip install requests -q 2>/dev/null || true
+        python "${{ github.action_path }}/../../scripts/notify_error.py" || true

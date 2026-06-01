@@ -29,6 +29,13 @@ jobs:
         run: |
           cd scripts
           python requirements_agent.py
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-error
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          failed-job: Requirements Agent (new issue)
 
   process-qa-approved:
     if: |
@@ -93,3 +100,10 @@ jobs:
         run: |
           cd scripts
           python requirements_agent.py
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-error
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          failed-job: Requirements Agent (showcase)
