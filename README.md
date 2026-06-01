@@ -28,6 +28,7 @@ IDEA_RECEIVED → REQUIREMENTS_DRAFTED → WAITING_FOR_HENDRIK_REQUIREMENTS_APPR
 
 ## Dokumentation
 
+- [Projektgedächtnis (MEMORY.md)](MEMORY.md)
 - [Workflow](docs/workflow.md)
 - [Governance](docs/governance.md)
 - [Architektur](docs/architecture.md)
