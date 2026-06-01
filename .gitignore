@@ -1,1 +1,5 @@
 .claude/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.telegram_offset
