@@ -5,7 +5,7 @@ import anthropic
 import requests
 from pathlib import Path
 from github_utils import get_repo, post_comment, set_labels, ensure_labels_exist, get_target_repo_name
-from telegram_utils import send_message
+from telegram_utils import send_message, send_photo
 
 SYSTEM_PROMPT = """Du bist der Design Agent für Hendriks repo-gebundenes Multi-Agent-Entwicklungssystem.
 
@@ -179,18 +179,23 @@ Design freigeben mit `/approve-design {issue_number}` oder Änderungswunsch mit 
     post_comment(issue, comment_body)
     set_labels(issue, ["status/design-ready"], ["status/approved-for-development"])
 
+    buttons = [
+        [("✅ Design freigeben", f"approve_design:{issue_number}"),
+         ("✏️ Ändern", f"noop:{issue_number}")]
+    ]
+
     # Send Telegram notification
     if screenshot_ok and Path(screenshot_path).exists():
-        send_telegram_photo(
+        send_photo(
             screenshot_path,
-            f"🎨 *Design bereit — Issue #{issue_number}: {issue.title[:50]}*\n\n"
-            f"Freigeben mit: `/approve-design {issue_number}`"
+            f"🎨 *Design bereit — Issue #{issue_number}: {issue.title[:50]}*",
+            buttons=buttons
         )
     else:
         send_message(
             f"🎨 *Design bereit — Issue #{issue_number}: {issue.title[:50]}*\n\n"
-            f"Design-Dokument wurde im Issue gepostet.\n\n"
-            f"Freigeben mit: `/approve-design {issue_number}`"
+            f"Design-Dokument wurde im Issue gepostet.",
+            buttons=buttons
         )
 
     print(f"Design posted for issue #{issue_number}")
