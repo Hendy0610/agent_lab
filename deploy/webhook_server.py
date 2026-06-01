@@ -33,7 +33,18 @@ GH_HEADERS = {
 # Telegram helpers
 # ---------------------------------------------------------------------------
 
-def send_message(text: str, buttons: list = None) -> None:
+MAIN_KEYBOARD = {
+    "keyboard": [
+        [{"text": "📋 Status"}, {"text": "💡 Neue Idee"}],
+        [{"text": "✅ Approve"}, {"text": "🎨 Design freigeben"}],
+        [{"text": "🔀 Merge"}, {"text": "🔒 Issue schließen"}],
+    ],
+    "resize_keyboard": True,
+    "persistent": True,
+}
+
+
+def send_message(text: str, buttons: list = None, use_keyboard: bool = False) -> None:
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": text,
@@ -46,6 +57,8 @@ def send_message(text: str, buttons: list = None) -> None:
                 for row in buttons
             ]
         }
+    elif use_keyboard:
+        payload["reply_markup"] = MAIN_KEYBOARD
     r = requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=10)
     if not r.ok:
         logger.error("Telegram sendMessage failed: %s", r.text[:200])
@@ -208,6 +221,10 @@ def handle_callback(callback_query: dict) -> None:
         handle_merge(num)
 
 
+# pending state: stores what action the user selected and is waiting for a number
+_pending: dict = {}
+
+
 def process_message(message: dict) -> None:
     from_chat = str(message.get("chat", {}).get("id", ""))
     if from_chat != TELEGRAM_CHAT_ID:
@@ -217,12 +234,59 @@ def process_message(message: dict) -> None:
     if not text:
         return
 
+    # Handle pending state (user selected a button and we're waiting for a number)
+    if from_chat in _pending:
+        action = _pending.pop(from_chat)
+        if re.match(r"^\d+$", text):
+            num = int(text)
+            if action == "approve":
+                handle_approve(num)
+            elif action == "approve_design":
+                handle_approve_design(num)
+            elif action == "merge":
+                handle_merge(num)
+            elif action == "close":
+                handle_close(num)
+            return
+        else:
+            send_message("❌ Keine gültige Nummer. Bitte nochmal versuchen.", use_keyboard=True)
+            return
+
+    # Keyboard button texts
+    if text == "📋 Status":
+        handle_status()
+        return
+    elif text == "💡 Neue Idee":
+        send_message("Schreib deine Idee als nächste Nachricht:")
+        return
+    elif text == "✅ Approve":
+        _pending[from_chat] = "approve"
+        send_message("Welche Issue-Nummer freigeben?")
+        return
+    elif text == "🎨 Design freigeben":
+        _pending[from_chat] = "approve_design"
+        send_message("Welche Issue-Nummer für Design-Freigabe?")
+        return
+    elif text == "🔀 Merge":
+        _pending[from_chat] = "merge"
+        send_message("Welche Issue-Nummer mergen?")
+        return
+    elif text == "🔒 Issue schließen":
+        _pending[from_chat] = "close"
+        send_message("Welche Issue-Nummer schließen?")
+        return
+
     approve_m = re.match(r"^/approve\s+(\d+)$", text, re.IGNORECASE)
     approve_design_m = re.match(r"^/approve-design\s+(\d+)$", text, re.IGNORECASE)
     merge_m = re.match(r"^/merge\s+(\d+)$", text, re.IGNORECASE)
     close_m = re.match(r"^/close\s+(\d+)$", text, re.IGNORECASE)
 
-    if approve_design_m:
+    if text.lower() in ("/start", "/help"):
+        send_message(
+            "👋 *Agent Lab Bot*\n\nNutze die Buttons unten oder tippe direkt eine Idee.",
+            use_keyboard=True,
+        )
+    elif approve_design_m:
         handle_approve_design(int(approve_design_m.group(1)))
     elif approve_m:
         handle_approve(int(approve_m.group(1)))
@@ -242,7 +306,8 @@ def process_message(message: dict) -> None:
             f"• `/approve-design <nummer>`\n"
             f"• `/merge <nummer>`\n"
             f"• `/close <nummer>`\n"
-            f"• `/status`"
+            f"• `/status`",
+            use_keyboard=True,
         )
 
 
