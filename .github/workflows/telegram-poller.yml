@@ -37,16 +37,21 @@ jobs:
       - name: Poll Telegram
         id: poll
         env:
+          GH_PAT: ${{ secrets.GH_PAT }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LAST_UPDATE_ID: ${{ steps.read-offset.outputs.offset }}
         run: |
           cd scripts
-          output=$(python telegram_poller.py)
+          output=$(python telegram_poller.py 2>&1)
           echo "$output"
           new_offset=$(echo "$output" | grep "NEW_OFFSET=" | cut -d= -f2)
-          echo "new_offset=$new_offset" >> $GITHUB_OUTPUT
+          if [ -n "$new_offset" ]; then
+            echo "new_offset=$new_offset" >> $GITHUB_OUTPUT
+          else
+            echo "new_offset=${{ steps.read-offset.outputs.offset }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Save offset
         run: echo "${{ steps.poll.outputs.new_offset }}" > .telegram_offset
