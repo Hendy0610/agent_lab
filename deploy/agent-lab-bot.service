@@ -7,7 +7,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/agent-lab-bot
 EnvironmentFile=/opt/agent-lab-bot/.env
-ExecStart=/opt/agent-lab-bot/venv/bin/uvicorn webhook_server:app --host 0.0.0.0 --port 8443
+ExecStart=/opt/agent-lab-bot/venv/bin/uvicorn webhook_server:app --host 0.0.0.0 --port 8443 --ssl-keyfile /opt/agent-lab-bot/server.key --ssl-certfile /opt/agent-lab-bot/server.crt
 Restart=always
 RestartSec=5
 
