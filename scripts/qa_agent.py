@@ -1,9 +1,26 @@
 import os
-import re
 import requests
 import anthropic
 from github_utils import get_repo, post_comment, set_labels, get_pr_diff, ensure_labels_exist, get_pr_info_from_issue
 from telegram_utils import send_message
+
+
+def get_memory_content(repo_name: str) -> tuple:
+    """Read MEMORY.md from the target repo. Returns (content, status) where
+    status is 'ok', 'missing', or 'error'."""
+    token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", "")
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    r = requests.get(
+        f"https://api.github.com/repos/{repo_name}/contents/MEMORY.md",
+        headers=headers
+    )
+    if r.status_code == 404:
+        return "", "missing"
+    if r.status_code != 200:
+        return "", "error"
+    import base64
+    content = base64.b64decode(r.json().get("content", "")).decode("utf-8", errors="replace")
+    return content, "ok"
 
 
 def get_ci_status(pr_head_sha: str, repo_name: str) -> tuple:
@@ -30,6 +47,7 @@ def get_ci_status(pr_head_sha: str, repo_name: str) -> tuple:
         names = ", ".join(r["name"] for r in pending)
         return "pending", f"⏳ Laufende Checks: {names}"
     return "success", f"✅ Alle {len(passed)} Checks bestanden."
+
 
 SYSTEM_PROMPT = """Du bist der QA & Architecture Agent für Hendriks repo-gebundenes Multi-Agent-Entwicklungssystem.
 
@@ -114,6 +132,18 @@ QA-Review startet nach Abschluss der CI-Checks.
         print("QA waiting: CI pending")
         return
 
+    # Read MEMORY.md from target repo
+    memory_content, memory_status = get_memory_content(target_repo_name)
+    if memory_status == "missing":
+        memory_section = "⚠️ MEMORY.md nicht gefunden — Governance- und Architekturregeln konnten nicht geladen werden."
+        memory_risk_note = "\n\n> **Risiko:** `MEMORY.md` fehlt im Ziel-Repository. Langlebige Projektregeln konnten nicht geprüft werden."
+    elif memory_status == "error":
+        memory_section = "⚠️ MEMORY.md konnte nicht gelesen werden (API-Fehler)."
+        memory_risk_note = "\n\n> **Risiko:** `MEMORY.md` war nicht lesbar. Governance-Check unvollständig."
+    else:
+        memory_section = memory_content[:3000]
+        memory_risk_note = ""
+
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     body = pr.body or ""
@@ -134,6 +164,9 @@ QA-Review startet nach Abschluss der CI-Checks.
 
 **CI-Status:** {ci_summary}
 
+**MEMORY.md — Projektgedächtnis:**
+{memory_section}
+
 Prüfe:
 1. Erfüllt der PR die Akzeptanzkriterien?
 2. Sind Tests vorhanden und sinnvoll?
@@ -142,8 +175,22 @@ Prüfe:
 5. Gibt es Security-, Compliance- oder Datenschutzrisiken?
 6. Gibt es Breaking Changes?
 7. Gibt es unnötige Komplexität?
+8. Verstößt der PR gegen Regeln, Entscheidungen oder Governance aus MEMORY.md?
 
-Gib am Ende deines Reviews eine klare Entscheidung:
+Struktur deines Reviews:
+Schreibe zuerst die normalen Prüfpunkte (1-7), dann zwingend einen eigenen Abschnitt:
+
+## Memory Check
+- Relevante Regeln aus MEMORY.md: (liste die relevanten Punkte auf)
+- Verstöße: (konkret benennen, oder "Keine Verstöße festgestellt")
+- Fazit: (kurz)
+
+{f"**Hinweis:** {memory_section}" if memory_status != "ok" else ""}
+
+Falls MEMORY.md fehlt oder nicht lesbar war, weise explizit auf dieses Risiko hin und setze den Verdict auf CHANGES_REQUESTED.
+Falls der PR gegen Regeln aus MEMORY.md verstößt, setze den Verdict auf CHANGES_REQUESTED oder BLOCKED.
+
+Gib am Ende eine klare Entscheidung:
 **VERDICT: APPROVED** oder **VERDICT: CHANGES_REQUESTED** oder **VERDICT: BLOCKED**
 
 Schreibe auf Deutsch."""
@@ -168,7 +215,7 @@ Schreibe auf Deutsch."""
 
     comment_body = f"""## {verdict_emoji} QA & Architecture Agent — Review
 
-{review_text}
+{review_text}{memory_risk_note}
 
 ---
 /{verdict.lower().replace('_', '-')}

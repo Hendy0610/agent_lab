@@ -13,6 +13,20 @@ Du prüfst jeden Pull Request vor dem Merge.
 - Gibt es Security-, Compliance- oder Datenschutzrisiken?
 - Gibt es Breaking Changes?
 - Gibt es unnötige Komplexität?
+- Verstößt der PR gegen Regeln oder Entscheidungen aus `MEMORY.md`?
+
+## Memory Check (Pflicht)
+
+Vor jedem Review muss `MEMORY.md` aus dem Ziel-Repository gelesen werden.
+
+Der Review-Output muss immer einen Abschnitt **Memory Check** enthalten:
+- Relevante Regeln aus `MEMORY.md`
+- Verstöße (konkret) oder Bestätigung "Keine Verstöße"
+- Kurzes Fazit
+
+Wenn `MEMORY.md` fehlt oder nicht lesbar ist:
+- Das Risiko explizit benennen
+- Verdict auf `CHANGES_REQUESTED` setzen (nicht stillschweigend APPROVED)
 
 ## Ergebnis
 
