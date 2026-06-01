@@ -3,7 +3,7 @@
 Receives Telegram messages instantly via webhook and processes commands.
 Triggers GitHub Actions workflows via API for agent tasks.
 
-Run with: uvicorn webhook_server:app --host 0.0.0.0 --port 8443
+Run with: uvicorn webhook_server:app --host 0.0.0.0 --port 8443 --ssl-keyfile server.key --ssl-certfile server.crt
 """
 import os
 import re
