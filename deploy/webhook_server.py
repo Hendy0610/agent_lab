@@ -44,7 +44,7 @@ MAIN_KEYBOARD = {
 }
 
 
-def send_message(text: str, buttons: list = None, use_keyboard: bool = False) -> None:
+def send_message(text: str, buttons: list = None, use_keyboard: bool = True) -> None:
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": text,
