@@ -47,12 +47,20 @@ Als ... möchte ich ..., damit ...
 
 Schreibe alles auf Deutsch. Sei konkret und umsetzbar."""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2000,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2000,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}]
+        )
+    except Exception as e:
+        send_message(
+            f"🚨 *Requirements Agent fehlgeschlagen — Issue #{issue_number}*\n\n"
+            f"Fehler: `{str(e)[:300]}`\n\n"
+            f"Bitte Anthropic Credits prüfen: console.anthropic.com"
+        )
+        raise
 
     requirements_text = message.content[0].text
 
