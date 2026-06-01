@@ -53,6 +53,19 @@ def handle_merge(issue_number: int, repo):
         send_message(f"❌ Fehler beim Merge von Issue #{issue_number}: {e}")
 
 
+def handle_close(issue_number: int, repo):
+    """Close a GitHub issue."""
+    try:
+        issue = repo.get_issue(issue_number)
+        if issue.state == "closed":
+            send_message(f"ℹ️ Issue #{issue_number} ist bereits geschlossen.")
+            return
+        issue.edit(state="closed")
+        send_message(f"🔒 *Issue #{issue_number} geschlossen!*\n_{issue.title}_")
+    except Exception as e:
+        send_message(f"❌ Fehler beim Schließen von Issue #{issue_number}: {e}")
+
+
 def handle_status(repo):
     """List open issues with their status."""
     issues = list(repo.get_issues(state="open"))[:10]
@@ -133,6 +146,7 @@ def main():
         approve_match = re.match(r'^/approve\s+(\d+)$', text, re.IGNORECASE)
         approve_design_match = re.match(r'^/approve-design\s+(\d+)$', text, re.IGNORECASE)
         merge_match = re.match(r'^/merge\s+(\d+)$', text, re.IGNORECASE)
+        close_match = re.match(r'^/close\s+(\d+)$', text, re.IGNORECASE)
 
         if approve_design_match:
             handle_approve_design(int(approve_design_match.group(1)), repo)
@@ -140,6 +154,8 @@ def main():
             handle_approve(int(approve_match.group(1)), repo)
         elif merge_match:
             handle_merge(int(merge_match.group(1)), repo)
+        elif close_match:
+            handle_close(int(close_match.group(1)), repo)
         elif text.lower() == '/status':
             handle_status(repo)
         elif not text.startswith('/'):
@@ -151,6 +167,7 @@ def main():
                 f"• `/approve <nummer>`\n"
                 f"• `/approve-design <nummer>`\n"
                 f"• `/merge <nummer>`\n"
+                f"• `/close <nummer>`\n"
                 f"• `/status`"
             )
 
